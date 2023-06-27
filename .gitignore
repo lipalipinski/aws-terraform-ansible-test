@@ -1,2 +1,5 @@
 *.swp
 .terraform/
+ssh-keys/
+rsa-kp
+rsa-kp.pub
