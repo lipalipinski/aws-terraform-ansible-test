@@ -23,3 +23,41 @@ resource "aws_key_pair" "worker-key" {
   key_name   = "jenkins"
   public_key = file("./ssh-keys/rsa-kp.pub")
 }
+
+# create ec2 in master region
+resource "aws_instance" "jenkins-master" {
+  provider                    = aws.region-master
+  ami                         = data.aws_ssm_parameter.linuxAmiMaster.value
+  instance_type               = var.instance-type
+  key_name                    = aws_key_pair.master-key.key_name
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.jenkins-sg.id]
+  subnet_id                   = aws_subnet.subnet_1.id
+
+  tags = {
+    Name = "jenkins_master_tf"
+  }
+
+  depends_on = [aws_main_route_table_association.set-master-rt]
+}
+
+# create ec2 in worker region
+resource "aws_instance" "jenkins-worker" {
+  provider                    = aws.region-worker
+  count                       = var.workers-count
+  ami                         = data.aws_ssm_parameter.linuxAmiWorker.value
+  instance_type               = var.instance-type
+  key_name                    = aws_key_pair.worker-key.key_name
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.jenkins-worker-sg.id]
+  subnet_id                   = aws_subnet.subnet_1-worker.id
+
+  tags = {
+    Name = join("_", ["jenkins_worker_tf", count.index + 1])
+  }
+
+  depends_on = [
+    aws_main_route_table_association.set-worker-rt,
+    aws_instance.jenkins-master
+  ]
+}
